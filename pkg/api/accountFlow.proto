@@ -1,0 +1,15 @@
+syntax = "proto3";
+package accountFlow;
+option go_package = "./accountFlow";
+// protoc --go_out=. --go-grpc_out=. accountFlow.proto
+
+message AccountFlow {
+  int64 AccountId = 1 [json_name = "account_id"];
+  int64 UploadFlow = 2 [json_name = "upload_flow"];
+}
+
+message AccountFlows {
+  repeated AccountFlow AccountFlowDatas = 1;
+}
+
+

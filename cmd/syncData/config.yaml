@@ -1,0 +1,29 @@
+# 日志配置,支持热更新
+logging:
+  level: debug # 日志级别 fatalln > error > warning > info > debug > trace > silent
+  console: true
+  path: ./flowdata.log # 日志路径
+
+# 数据库配置,支持热更新
+database:
+  type: mysql # 数据库类型
+  # host: 192.168.31.108:29996 # 数据库地址
+  host: 154.21.202.43:29996
+  user: root # 数据库用户名
+  password: mysdkdata # 数据库密码
+  dbname: flowmanger # 数据库名称
+  log: info # 数据库日志级别  silent >  rrror > Warn  > Info 
+
+kafka:
+  topic: flow # kafka topic
+  brokers: 204.188.222.186:1002 # kafka地址
+  minBytes: 0 # kafka消费者最小字节数
+  maxBytes: 0 # kafka消费者最大字节数
+  group: syncFlowData # Kafka消费者组ID
+  partition: 0 # kafka分区
+
+
+
+
+  
+  

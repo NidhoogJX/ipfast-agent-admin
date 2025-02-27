@@ -1,0 +1,7 @@
+pkg/util/ip/ipdata
+cmd/api/mysql/
+cmd/api/log/
+vendor/
+*.exe
+*.log
+*.csv

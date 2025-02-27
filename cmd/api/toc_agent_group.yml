@@ -1,0 +1,96 @@
+name: toc-agent_group
+
+services:
+  toc-agent:
+    image: ${IMAGE_NAME}
+    container_name: ${CONTAINER_NAME}
+    restart: always
+    ports:
+      - "${HOST_PORT}:${CONTAINER_PORT}"
+    volumes:
+      - ./config.yaml:/app/config.yaml
+      - ./locales:/app/locales
+      - ./static:/app/static
+      - ./log:/app/log
+    # depends_on:
+    #   - mysql
+    networks:
+        ipfast_network:
+          ipv4_address: 172.101.100.8
+
+  # mysql:
+  #   image: mysql:8.0.31
+  #   command: --default-authentication-plugin=mysql_native_password
+  #   restart: always
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: mysdkdata
+  #     MYSQL_DATABASE: flowmanger
+  #     TZ: Asia/Shanghai
+  #   volumes:
+  #     - ./mysql:/var/lib/mysql
+  #     - /etc/localtime:/etc/localtime:ro
+  #     - ./etc/mysql/my.cnf:/etc/mysql/my.cnf 
+  #     # 初始化sql脚本 如果 ./mysql:/var/lib/mysql 不为空则认为已初始化,不再执行这里的sql脚本
+  #     - ./script:/docker-entrypoint-initdb.d 
+  #   ports:
+  #     - "29996:3306"
+  #   networks:
+  #     ipfast_network:
+  #       ipv4_address: 172.101.100.3
+  #   container_name: ipfast_mysql
+  
+  # redis:
+  #   image: redis
+  #   restart: always
+  #   command: redis-server --requirepass myredisdata
+  #   ports:
+  #     - "6380:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   networks:
+  #     ipfast_network:
+  #       ipv4_address: 172.101.100.4
+  #   container_name: ipfast_redis
+  
+  # nginx:
+  #   image: nginx
+  #   container_name: nginx
+  #   networks:
+  #     ipfast_network:
+  #       ipv4_address: 172.101.100.5
+  #   ports:
+  #     - "80:80"
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "50m"
+  #       max-file: "1"
+  #   ulimits:
+  #     nofile:
+  #       soft: 125000
+  #       hard: 125000
+  #   volumes:
+  #     - /etc/localtime:/etc/localtime:ro
+  #     - /run/ipfast/www/:/home/www
+  #     - /etc/nginx/conf.d:/etc/nginx/conf.d
+  #     - /etc/nginx/nginx.conf:/etc/nginx/nginx.conf
+  #     - /var/log/nginx:/var/log/nginx
+  #   privileged: true
+  #   restart: always
+
+
+# volumes:
+#   redis_data: {}
+
+networks:
+  ipfast_network:
+    external: true
+    # name: ipfast_network
+    # driver: bridge
+    # ipam:
+    #   config:
+    #     - subnet: 172.101.0.0/16
+    #       gateway: 172.101.100.1
+  
+  #  docker compose -f ipfast_group.yml up -d
+  #   docker compose -f ipfast_group.yml down  --volumes 

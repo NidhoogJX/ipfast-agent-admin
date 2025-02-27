@@ -1,0 +1,67 @@
+# AD服务配置
+server:
+  debug: true # 是否开启debug模式
+  serverAddr: ip2fast.com # 服务地址
+  payMode: prod # 支付模式 dev:开发模式, prod:生产模式
+
+# AD接口服务配置,支持热更新
+web:
+  port: 8098 # 接口服务端口号
+  mode: release # debug, release gin 的运行模式
+  recordLog: true # 是否开启记录请求日志中间件
+  recovery: true # 是否开启恢复中间件
+  allowCors: true # 是否开启允许跨域请求中间件
+  readTimeout: 15 # 读取超时时间
+  weiteTimeout: 15 # 写入超时时间
+
+# 日志配置,支持热更新
+logging:
+  level: debug # 日志级别 fatalln > error > warning > info > debug > trace > silent
+  console: true
+  path: ./log/toc-agent.log # 日志路径
+
+
+# 数据库配置,支持热更新
+database:
+  type: mysql # 数据库类型
+  # host: 127.0.0.1:19996 # 数据库地址
+  # host: 154.21.202.43:29996
+  host: 18.162.191.165:9306
+  user: root # 数据库用户名
+  password: mysdkdata # 数据库密码
+  dbname: flowmanger # 数据库名称
+  log: info # 数据库日志级别  silent >  rrror > Warn  > Info 
+
+# redis配置,支持热更新
+redis:
+  host: 192.168.40.54:6379
+  password: "myredisdata"
+  db: 0
+  poolSize: 20
+
+ipdata:
+  path: ./locales/ip2location.csv
+
+# 数据库配置,支持热更新
+# database:
+#   type: mysql # 数据库类型
+#   host: ipfast_mysql:3306 # 数据库地址
+#   user: root # 数据库用户名
+#   password: mysdkdata # 数据库密码
+#   dbname: flowmanger # 数据库名称
+#   log: Info # 数据库日志级别  Silent >  Error > Warn  > Info 
+
+
+
+
+# # redis配置,支持热更新
+# redis:
+#   host: ipfast_redis:6379
+#   password: "myredisdata"
+#   db: 0
+#   poolSize: 20
+
+
+
+  
+  
