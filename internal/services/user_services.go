@@ -278,6 +278,7 @@ func AddAgent(username, password, description string) (err error) {
 	err = models.Agent{
 		Name:        username,
 		Password:    generateMD5(password + salt),
+		AppKey:      generateMD5(username + salt),
 		Salt:        salt,
 		Description: description,
 		Status:      1,
