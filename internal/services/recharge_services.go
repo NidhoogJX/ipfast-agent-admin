@@ -6,8 +6,8 @@ import (
 )
 
 // 代理商充值记录查询
-func GetRechargeList(agentId int64, rechargeId string, page, size int, status int8) (rechargeList []models.Recharge, total int64, err error) {
-	rechargeList, total, err = models.Recharge{}.SelectRechargeList(agentId, rechargeId, page, size, status)
+func GetRechargeList(rechargeId string, page, size int) (rechargeList []models.RechargeInfo, total int64, err error) {
+	rechargeList, total, err = models.Recharge{}.SelectRechargeList(rechargeId, page, size)
 	if err != nil {
 		err = fmt.Errorf("failed to get recharge list")
 	}

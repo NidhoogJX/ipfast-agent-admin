@@ -12,7 +12,6 @@ func GetRechargeList(resp server.Response) {
 		Page       int    `json:"page"`
 		PageSize   int    `json:"page_size"`
 		RechargeId string `json:"recharge_id"`
-		Status     int8   `json:"status"`
 	}{}
 	err := resp.Json(&param)
 	if err != nil {
@@ -20,11 +19,11 @@ func GetRechargeList(resp server.Response) {
 		return
 	}
 	uid := resp.GetUserID("user_id")
-	if uid <= 0 || param.Page <= 0 || param.PageSize <= 0 || (param.Status != 0 && param.Status != 1 && param.Status != 2) {
+	if uid <= 0 || param.Page <= 0 || param.PageSize <= 0 {
 		resp.Failed("param error")
 		return
 	}
-	rechargeList, total, err := services.GetRechargeList(uid, param.RechargeId, param.Page, param.PageSize, param.Status)
+	rechargeList, total, err := services.GetRechargeList(param.RechargeId, param.Page, param.PageSize)
 	if err != nil {
 		resp.Failed(fmt.Sprintf("%v", err))
 		return

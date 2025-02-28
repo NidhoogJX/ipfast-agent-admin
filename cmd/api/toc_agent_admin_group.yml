@@ -1,4 +1,4 @@
-name: toc-agent_group
+name: toc-agent_admin_group
 
 services:
   toc-agent:

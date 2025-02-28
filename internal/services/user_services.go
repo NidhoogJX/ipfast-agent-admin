@@ -244,116 +244,62 @@ func GetAdminByUserId(uid int64) (admin models.Admin, err error) {
 	return
 }
 
-// 获取代理商信息
-func GetAgentInfo(uid int64) (agent models.Agent, err error) {
-	agent, err = models.Agent{
-		Id: uid,
-	}.FindById()
+// 获取代理商列表
+func GetAgentList(page, size int, username string) (agentList []models.AgentInfo, total int64, err error) {
+	agentList, total, err = models.Agent{}.SelectAgentList(page, size, username)
 	if err != nil {
-		err = fmt.Errorf("failed to obtain agent information")
+		err = fmt.Errorf("failed to obtain agent list")
 	}
 	return
 }
 
-// 记录代理商登录信息
-func RecordAgentLoginIpAndTime(agent models.Agent, ip string) error {
-	agent.LoginIp = ip
-	agent.LoginTime = time.Now().Unix()
-	err := agent.UpdateLoginInfo()
-	if err != nil {
-		return fmt.Errorf("failed to record login information")
-	}
-	return nil
-}
-
-// 获取代理商的流量统计
-func GetTotalFlowDetail(id int64) (flowDetail models.AgentFlowInfo, err error) {
-	flowDetail, err = models.Agent{}.SelectTotalFlowInfo(id)
-	if err != nil {
-		err = fmt.Errorf("failed to obtain flow detail")
-	}
-	return
-}
-
-// 获取代理商当天的流量统计
-func GetCurrentFlowDetail(id int64) (currentFlowDetail models.CurrentAgentFlowInfo, err error) {
-	// 获取当日0点时间戳
-	t := time.Now()
-	currentTime := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
-	startTime := currentTime.Unix()
-	endTime := startTime + 86400
-	currentFlowDetail, err = models.Agent{}.SelectCurrentFlowInfo(id, startTime, endTime)
-	if err != nil {
-		err = fmt.Errorf("failed to obtain user current flow detail")
-	}
-	return
-}
-
-// 获取用户的流量明细
-func GetUserFlowDetail(id, startTime, endTime int64) (flowDate []models.DateFlow, err error) {
-	flowDate, err = models.Agent{}.SelectUserFlowInfo(id, startTime, endTime)
-	if err != nil {
-		err = fmt.Errorf("failed to obtain user flow detail")
-	}
-	return
-}
-
-// 用户列表查询
-func GetUserListByPage(agentId int64, username string, page, pageSize int, status, totalSort, usedSort, enableSort int8) (userList []models.UserInfo, total int64, err error) {
-	userList, total, err = models.User{}.SelectUserList(agentId, username, page, pageSize, status, totalSort, usedSort, enableSort)
-	if err != nil {
-		return []models.UserInfo{}, total, fmt.Errorf("failed to obtain user list")
-	}
-	return
-}
-
-// 代理商添加用户
-func AddUser(agentId int64, username, password, description string) (err error) {
-	// 检查用户名、密码格式
+// 添加代理商
+func AddAgent(username, password, description string) (err error) {
+	// 验证用户名、密码格式
 	err = CheckNameAndPassword(username, password)
 	if err != nil {
 		return err
 	}
-	// 检查用户名是否重复
-	count, err := models.User{
+	// 验证代理商用户名是否重复
+	count, err := models.Agent{
 		Name: username,
-	}.CheckUsernameExist()
+	}.IsExistByName()
 	if err != nil {
-		err = fmt.Errorf("failed to check username exist")
-		return err
+		return fmt.Errorf("failed to check agent exist")
 	}
-	if count > 0 {
+	if count != 0 {
 		return fmt.Errorf("username already exists")
 	}
 	salt, err := generateSalt(6)
 	if err != nil {
-		err = fmt.Errorf("failed to generate salt")
+		return fmt.Errorf("failed to generate salt")
 	}
 	now := time.Now().Unix()
-	models.User{
+	err = models.Agent{
 		Name:        username,
-		AgentId:     agentId,
 		Password:    generateMD5(password + salt),
 		Salt:        salt,
-		AppKey:      generateMD5(username + salt),
 		Description: description,
 		Status:      1,
 		CreateTime:  now,
 		UpdateTime:  now,
 	}.Create()
+	if err != nil {
+		return fmt.Errorf("failed to add agent")
+	}
 	return
 }
 
-// 代理商修改用户信息
-func EditUser(userId int64, password, description string, status int8) (err error) {
-	user, err := models.User{
-		Id: userId,
-	}.SelectById()
+// 编辑代理商信息
+func EditAgent(agentId int64, password, description string, status int8) (err error) {
+	agent, err := models.Agent{
+		Id: agentId,
+	}.FindById()
 	if err != nil {
-		err = fmt.Errorf("failed to obtain user information")
+		err = fmt.Errorf("failed to obtain agent information")
 		return
 	}
-	if password != user.Password {
+	if password != agent.Password {
 		// 检查密码格式，(跳过用户名)
 		err = CheckNameAndPassword("username", password)
 		if err != nil {
@@ -364,20 +310,108 @@ func EditUser(userId int64, password, description string, status int8) (err erro
 			err = fmt.Errorf("failed to generate salt")
 			return err
 		}
-		user.Password = generateMD5(password + salt)
-		user.Salt = salt
+		agent.Password = generateMD5(password + salt)
+		agent.Salt = salt
 	}
 	now := time.Now().Unix()
-	err = models.User{
-		Id:          userId,
-		Password:    user.Password,
-		Salt:        user.Salt,
-		Description: description,
-		Status:      1,
-		UpdateTime:  now,
-	}.UpdateUserInfo()
+	agent.Status = status
+	agent.Description = description
+	agent.UpdateTime = now
+	agent.UpdateInfo()
 	if err != nil {
 		err = fmt.Errorf("failed to update user information")
+	}
+	return
+}
+
+// 给代理商充值流量
+func RechargeFlowToAgent(agentId, count int64, sign, description string) (err error) {
+	// 检查代理商是否存在
+	agent, err := models.Agent{
+		Id: agentId,
+	}.FindById()
+	if err != nil {
+		return fmt.Errorf("failed to obtain agent information")
+	}
+	if agent.Id == 0 {
+		return fmt.Errorf("agent not found")
+	}
+	if agent.Status != 1 {
+		return fmt.Errorf("agent is disabled")
+	}
+	nowTime := time.Now().Unix()
+	now := time.Now()
+	msec := now.UnixMilli() % 1000
+	rechargeId := fmt.Sprintf("%04d%02d%02d%02d%02d%02d%03d", now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(), msec)
+	flow := count * 1024 * 1024 * 1024
+	if sign == "+" {
+		if count > 100000000 {
+			return fmt.Errorf("recharge count is too large")
+		}
+		// 开启事务处理
+		err = models.DB.Instance.Transaction(func(tx *gorm.DB) error {
+			// 为代理商添加流量
+			err = models.Agent{
+				Id: agentId,
+			}.RechargeFlow(flow, nowTime)
+			if err != nil {
+				log.Error("failed to recharge flow to agent, agentId: %d", agentId)
+				return fmt.Errorf("failed to recharge flow to agent")
+			}
+			// 添加流量充值记录
+			err = models.Recharge{
+				Id:          rechargeId,
+				AgentID:     agentId,
+				Count:       count,
+				Unit:        1,
+				PayMethod:   "管理员充值",
+				Description: description,
+				Status:      1,
+				CreateTime:  nowTime,
+				UpdateTime:  nowTime,
+			}.Create()
+			if err != nil {
+				log.Error("failed to add recharge record to agent, agentId: %d", agentId)
+				return fmt.Errorf("failed to add recharge record to agent")
+			}
+			return nil
+		})
+	} else {
+		if agent.TotalFlow < flow {
+			log.Error("reduced flow more than total flow of agents, agentId: %d", agentId)
+			return fmt.Errorf("reduced flow more than total flow of agents")
+		}
+		// 开启事务处理
+		err = models.DB.Instance.Transaction(func(tx *gorm.DB) error {
+			// 减少代理商流量
+			err = models.Agent{
+				Id: agentId,
+			}.ReduceFlow(flow, nowTime)
+			if err != nil {
+				log.Error("failed to reduce flow to agent, agentId: %d", agentId)
+				return fmt.Errorf("failed to reduce flow to agent")
+			}
+			// 添加流量减少记录
+			err = models.Recharge{
+				Id:          rechargeId,
+				AgentID:     agentId,
+				Count:       -count,
+				Unit:        1,
+				PayMethod:   "管理员充值",
+				Description: description,
+				Status:      1,
+				CreateTime:  nowTime,
+				UpdateTime:  nowTime,
+			}.Create()
+			if err != nil {
+				log.Error("failed to add recharge record to agent, agentId: %d", agentId)
+				return fmt.Errorf("failed to add recharge record to agent")
+			}
+			return nil
+		})
+	}
+	if err != nil {
+		log.Info("分配流量成功, agentId: %d, sign: %s, count: %d", agentId, sign, count)
 	}
 	return
 }
@@ -406,69 +440,11 @@ func CheckNameAndPassword(customerName, password string) error {
 	}
 }
 
-// 代理商为用户分配流量
-func DistributeFlowToUser(agentId, userId int64, count float64) (err error) {
-	now := time.Now().Unix()
-	flow := int64(count * 1024 * 1024 * 1024)
-	// 开启事务处理
-	err = models.DB.Instance.Transaction(func(tx *gorm.DB) error {
-		// 判断代理商流量余额是否足够
-		agent, err := models.Agent{
-			Id: agentId,
-		}.FindById()
-		if err != nil {
-			log.Error("failed to obtain agent information, agentId: %d", agentId)
-			return fmt.Errorf("failed to obtain agent information")
-		}
-		if agent.TotalFlow-agent.DistributeFlow < flow {
-			return fmt.Errorf("not enough flow")
-		}
-		// 检查用户是否存在,且可正常使用
-		user, err := models.User{
-			Id: userId,
-		}.FindById()
-		if err != nil || user.Id == 0 {
-			return fmt.Errorf("failed to obtain user information")
-		}
-		if user.Status != 1 {
-			return fmt.Errorf("user is disabled")
-		}
-		// 为用户添加流量
-		err = models.FlowRecord{
-			UserID:        userId,
-			AgentId:       agentId,
-			Type:          2, // 流量记录类型(1:购买流量/管理员分配,2:代理商分配流量)
-			PurchasedFlow: flow,
-			Deadline:      now + 86400*365,
-			OrderId:       "1", // 订单ID(管理员添加的流量为0;代理商分配的为1)
-			CreatedTime:   now,
-			UpdatedTime:   now,
-		}.Create()
-		if err != nil {
-			log.Error("failed to add flow record to user, userId: %d, agentId: %d", userId, agentId)
-			return fmt.Errorf("failed to add flow record to user")
-		}
-		// 扣除代理商流量
-		agent.DistributeFlow += flow
-		agent.UpdateTime = now
-		err = agent.UpdateFlowInfo()
-		if err != nil {
-			log.Error("failed to update agent flow information, agentId: %d", agentId)
-			return fmt.Errorf("failed to update agent flow information")
-		}
-		return nil
-	})
+// 获取代理商的用户列表
+func GetUserList(page, size int, agentId int64, username string) (userList []models.UserInfo, total int64, err error) {
+	userList, total, err = models.User{}.SelectUserList(page, size, agentId, username)
 	if err != nil {
-		log.Info("分配流量成功,agentId: %d, userId: %d, flow: %d", agentId, userId, flow)
-	}
-	return
-}
-
-// 代理商的流量分配日志
-func GetDistributeFlowLog(agentId int64, page, pageSize int, username string) (distributeLogList []models.DistributeFlowLog, total int64, err error) {
-	distributeLogList, total, err = models.FlowRecord{}.SelectDistributeFlowLog(agentId, page, pageSize, username)
-	if err != nil {
-		err = fmt.Errorf("failed to obtain distribute flow log")
+		err = fmt.Errorf("failed to obtain user list")
 	}
 	return
 }

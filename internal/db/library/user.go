@@ -61,27 +61,21 @@ func GetUser(accout string) (user *User, err error) {
 }
 
 /*
-账号密码登陆
+管理员账号密码登陆
 */
-func Auth(name, password string) (agent models.Agent, err error) {
-	if IsValidEmail(name) {
-		agent, err = models.Agent{
-			Email: name,
-		}.FindByEmail()
-	} else {
-		agent, err = models.Agent{
-			Name: name,
-		}.FindByName()
-	}
-	if err != nil || agent.Id == 0 {
+func Auth(name, password string) (admin models.Admin, err error) {
+	admin, err = models.Admin{
+		Name: name,
+	}.FindByName()
+	if err != nil || admin.Id == 0 {
 		err = fmt.Errorf("account does not exist/has been cancelled")
 		return
 	}
-	if agent.Password != generateMD5(password+agent.Salt) {
+	if admin.Password != generateMD5(password+admin.Salt) {
 		err = fmt.Errorf("account or password error")
 		return
 	}
-	if agent.Status == 0 {
+	if admin.Status == 0 {
 		err = fmt.Errorf("account has been disabled")
 		return
 	}

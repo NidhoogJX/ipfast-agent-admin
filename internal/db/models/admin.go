@@ -22,7 +22,7 @@ func (Admin) TableName() string {
 }
 
 // 根据用户名查询管理员信息
-func (model Admin) FindByName() (admin *Admin, err error) {
+func (model Admin) FindByName() (admin Admin, err error) {
 	err = DB.Where("name = ?", model.Name).Find(&admin).Error
 	return
 }

@@ -1,5 +1,9 @@
 package models
 
+import (
+	"gorm.io/gorm"
+)
+
 // 代理商管理
 type Agent struct {
 	Id             int64  `json:"id" gorm:"primary_key;AUTO_INCREMENT;comment:账号ID"`
@@ -17,6 +21,29 @@ type Agent struct {
 	Description    string `json:"description" gorm:"type:varchar(500);comment:备注"`
 	CreateTime     int64  `json:"create_time" gorm:"type:bigint unsigned;default:0;not null;comment:注册时间"`
 	UpdateTime     int64  `json:"update_time" gorm:"type:bigint unsigned;default:0;not null;comment:会员信息上次更新时间"`
+}
+
+type AgentInfo struct {
+	Id          int64  `json:"id"`
+	Name        string `json:"name"`
+	Email       string `json:"email"`
+	Phone       string `json:"phone"`
+	Password    string `json:"password"`
+	TotalFlow   int64  `json:"total_flow"`
+	EnableFlow  int64  `json:"enable_flow"`
+	UserCount   int64  `json:"user_count"`
+	Status      int8   `json:"status"`
+	Description string `json:"description"`
+	CreateTime  int64  `json:"create_time"`
+	UpdateTime  int64  `json:"update_time"`
+}
+
+var AgentField = []string{
+	"password",
+	"salt",
+	"status",
+	"description",
+	"update_time",
 }
 
 // 整体流量明细
@@ -46,8 +73,8 @@ func (model Agent) FindByEmail() (agent Agent, err error) {
 }
 
 // 根据用户名查询代理商信息
-func (model Agent) FindByName() (agent Agent, err error) {
-	err = DB.Model(&model).Select("*").Where("name = ?", model.Name).First(&agent).Error
+func (model Agent) IsExistByName() (count int64, err error) {
+	err = DB.Model(&model).Select("COUNT(*)").Where("name = ?", model.Name).Limit(1).Scan(&count).Error
 	return
 }
 
@@ -120,5 +147,63 @@ func (model Agent) SelectUserFlowInfo(id int64, startTime, endTime int64) (flowD
 		GROUP BY a.date
 		ORDER BY a.date 
 	`, id, startTime, endTime).Scan(&flowDate).Error
+	return
+}
+
+// 获取代理商列表
+func (model Agent) SelectAgentList(page, size int, username string) (agentList []AgentInfo, total int64, err error) {
+	tx := DB.Table("ip_agent AS ia")
+	if username != "" {
+		tx.Where("ia.name LIKE ?", "%"+username+"%")
+	}
+	err = tx.Select(`
+		ia.id,
+		ia.name,
+		ia.password,
+		ia.email,
+		ia.phone,
+		ia.total_flow,
+		(ia.total_flow - ia.distribute_flow) AS enable_flow,
+		COUNT(iu.id) AS user_count,
+		ia.status,
+		ia.description,
+		ia.create_time,
+		ia.update_time
+		`).
+		Joins("LEFT JOIN ip_user AS iu ON ia.id = iu.agent_id").
+		Group("ia.id").
+		Order("ia.create_time DESC").
+		Count(&total).
+		Offset((page - 1) * size).
+		Limit(size).
+		Scan(&agentList).Error
+	return
+}
+
+// 创建代理商
+func (model Agent) Create() error {
+	return DB.Create(&model).Error
+}
+
+// 更新
+func (model Agent) UpdateInfo() error {
+	return DB.Model(&model).Select(AgentField).Updates(model).Error
+}
+
+// 给代理商充值流量
+func (model Agent) RechargeFlow(count, updateTime int64) (err error) {
+	err = DB.Model(&model).Updates(map[string]interface{}{
+		"total_flow":  gorm.Expr("total_flow + ?", count),
+		"update_time": updateTime,
+	}).Error
+	return
+}
+
+// 减少代理商流量
+func (model Agent) ReduceFlow(count, updateTime int64) (err error) {
+	err = DB.Model(&model).Updates(map[string]interface{}{
+		"total_flow":  gorm.Expr("total_flow - ?", count),
+		"update_time": updateTime,
+	}).Error
 	return
 }

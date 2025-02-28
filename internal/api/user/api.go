@@ -3,11 +3,9 @@ package user
 import (
 	"fmt"
 	"ipfast_server/internal/db/library"
-	emailhandler "ipfast_server/internal/handler/emailHandler"
 	"ipfast_server/internal/handler/network/server"
 	"ipfast_server/internal/services"
 	"ipfast_server/pkg/util/log"
-	"math/rand"
 	"time"
 )
 
@@ -25,33 +23,33 @@ func Login(resp server.Response) {
 		return
 	}
 	// 账号密码登录
-	agent, err := library.Auth(param.Username, param.Password)
+	admin, err := library.Auth(param.Username, param.Password)
 	if err != nil {
 		resp.Failed(fmt.Sprintf("%v", err))
 		return
 	}
-	token, err := server.GenerateToken(fmt.Sprintf("%d", agent.Id))
+	token, err := server.GenerateToken(fmt.Sprintf("%d", admin.Id))
 	if err != nil {
 		log.Error("GenerateToken error:%v", err)
 		resp.Failed("auth failed, please contact the administrator")
 		return
 	}
 	// 记录登录时间和ip
-	err = services.RecordAgentLoginIpAndTime(agent, resp.Context.ClientIP())
+	err = services.RecordAdminLoginIpAndTime(admin, resp.Context.ClientIP())
 	if err != nil {
 		resp.Failed("failed to record login information")
 		return
 	}
 	resp.Res["auth_token"] = token
-	resp.Res["user_id"] = agent.Id
-	resp.Res["app_key"] = agent.AppKey
-	resp.Res["login_time"] = agent.LoginTime
-	resp.Res["create_time"] = formatTimestamp(agent.CreateTime)
+	resp.Res["user_name"] = admin.Name
+	resp.Res["user_id"] = admin.Id
+	resp.Res["login_time"] = admin.LoginTime
+	resp.Res["create_time"] = formatTimestamp(admin.CreateTime)
 	resp.Success("operate success")
 }
 
 /*
-获取代理商信息
+获取管理员信息
 */
 func UserInfo(resp server.Response) {
 	uid := resp.GetUserID("user_id")
@@ -59,7 +57,7 @@ func UserInfo(resp server.Response) {
 		resp.Failed("param error")
 		return
 	}
-	agent, err := services.GetAgentInfo(uid)
+	agent, err := services.GetAdminByUserId(uid)
 	if err != nil {
 		resp.Failed("failed to obtain current user information")
 		return
@@ -78,191 +76,6 @@ func formatTimestamp(timestamp int64) string {
 	return t.Format("2006-01-02 15:04:05")
 }
 
-// 获取整体流量统计
-func GetTotalFlowDetail(resp server.Response) {
-	uid := resp.GetUserID("user_id")
-	if uid <= 0 {
-		resp.Failed("param error")
-		return
-	}
-	flowDetail, err := services.GetTotalFlowDetail(uid)
-	if err != nil {
-		resp.Failed("failed to obtain user flow detail")
-		return
-	}
-	resp.Res["flow_detail"] = flowDetail
-	resp.Success("operate success")
-}
-
-// 获取当天流量统计
-func GetCurrentFlowDetail(resp server.Response) {
-	uid := resp.GetUserID("user_id")
-	if uid <= 0 {
-		resp.Failed("param error")
-		return
-	}
-	flowDetail, err := services.GetCurrentFlowDetail(uid)
-	if err != nil {
-		resp.Failed(fmt.Sprintf("%v", err))
-		return
-	}
-	resp.Res["current_flow_detail"] = flowDetail
-	resp.Success("operate success")
-}
-
-// 获取用户流量明细
-func GetUserFlowDetail(resp server.Response) {
-	param := struct {
-		StartTime int64 `json:"start_time"`
-		EndTime   int64 `json:"end_time"`
-	}{}
-	err := resp.Json(&param)
-	if err != nil {
-		resp.Failed("param error")
-		return
-	}
-	uid := resp.GetUserID("user_id")
-	if uid <= 0 || param.StartTime < 0 || param.EndTime < 0 || param.EndTime < param.StartTime {
-		resp.Failed("param error")
-		return
-	}
-	flowDate, err := services.GetUserFlowDetail(uid, param.StartTime, param.EndTime)
-	if err != nil {
-		resp.Failed("failed to obtain user flow detail")
-		return
-	}
-	resp.Res["flow_date"] = flowDate
-	resp.Success("operate success")
-}
-
-// 获取代理商的用户列表
-func GetUserList(resp server.Response) {
-	param := struct {
-		Page       int    `json:"page"`
-		PageSize   int    `json:"page_size"`
-		Username   string `json:"username"`
-		Status     int8   `json:"status"`
-		TotalSort  int8   `json:"total_sort"`
-		UsedSort   int8   `json:"used_sort"`
-		EnableSort int8   `json:"enable_sort"`
-	}{}
-	err := resp.Json(&param)
-	if err != nil {
-		resp.Failed("param error")
-		return
-	}
-	uid := resp.GetUserID("user_id")
-	if uid <= 0 || param.Page <= 0 || param.PageSize <= 0 || (param.Status != 0 && param.Status != 1 && param.Status != 2) {
-		resp.Failed("param error")
-		return
-	}
-	userList, total, err := services.GetUserListByPage(uid, param.Username, param.Page, param.PageSize, param.Status, param.TotalSort, param.UsedSort, param.EnableSort)
-	if err != nil {
-		resp.Failed("failed to obtain user list")
-		return
-	}
-	resp.Res["user_list"] = userList
-	resp.Res["total"] = total
-	resp.Success("operate success")
-}
-
-// 代理商添加用户
-func AddUser(resp server.Response) {
-	param := struct {
-		Username    string `json:"username"`
-		Password    string `json:"password"`
-		Description string `json:"description"`
-	}{}
-	err := resp.Json(&param)
-	if err != nil {
-		resp.Failed("param error")
-	}
-	uid := resp.GetUserID("user_id")
-	if uid <= 0 || param.Username == "" || param.Password <= "" {
-		resp.Failed("param error")
-		return
-	}
-	err = services.AddUser(uid, param.Username, param.Password, param.Description)
-	if err != nil {
-		resp.Failed(fmt.Sprintf("%v", err))
-		return
-	}
-	resp.Success("operate success")
-}
-
-// 修改用户信息
-func EditUser(resp server.Response) {
-	param := struct {
-		UserId      int64  `json:"user_id"`
-		Password    string `json:"password"`
-		Status      int8   `json:"status"`
-		Description string `json:"description"`
-	}{}
-	err := resp.Json(&param)
-	if err != nil {
-		resp.Failed("param error")
-		return
-	}
-	uid := resp.GetUserID("user_id")
-	if uid <= 0 || param.UserId <= 0 || param.Status < 0 {
-		resp.Failed("param error")
-		return
-	}
-	err = services.EditUser(param.UserId, param.Password, param.Description, param.Status)
-	if err != nil {
-		resp.Failed(fmt.Sprintf("%v", err))
-		return
-	}
-	resp.Success("operate success")
-}
-
-// 给用户分配流量
-func DistributeFlowToUser(resp server.Response) {
-	param := struct {
-		UserId int64   `json:"user_id"`
-		Count  float64 `json:"count"`
-	}{}
-	err := resp.Json(&param)
-	if err != nil {
-		resp.Failed("param error")
-		return
-	}
-	uid := resp.GetUserID("user_id")
-	if uid <= 0 || param.UserId <= 0 || param.Count <= 0 {
-		resp.Failed("param error")
-		return
-	}
-	err = services.DistributeFlowToUser(uid, param.UserId, param.Count)
-	if err != nil {
-		resp.Failed(fmt.Sprintf("%v", err))
-		return
-	}
-	resp.Success("operate success")
-}
-
-// 获取流量分配日志
-func GetDistributeFlowLog(resp server.Response) {
-	param := struct {
-		Page     int    `json:"page"`
-		PageSize int    `json:"page_size"`
-		Username string `json:"username"`
-	}{}
-	err := resp.Json(&param)
-	if err != nil {
-		resp.Failed("param error")
-		return
-	}
-	uid := resp.GetUserID("user_id")
-	if uid <= 0 || param.Page <= 0 || param.PageSize <= 0 {
-		resp.Failed("param error")
-		return
-	}
-	distributeLogList, total, err := services.GetDistributeFlowLog(uid, param.Page, param.PageSize, param.Username)
-	resp.Res["distribute_log_list"] = distributeLogList
-	resp.Res["total"] = total
-	resp.Success("operate success")
-}
-
 /*
 账号退出登陆
 
@@ -278,96 +91,32 @@ func LoginOut(resp server.Response) {
 	resp.Success("operate success")
 }
 
-// 申请验证码
-func ApplyVerificationCode(resp server.Response) {
-	param := &struct {
-		Email string `json:"email"`
-	}{}
-	err := resp.Json(param)
-	if err != nil || param.Email == "" {
-		resp.Failed("param error")
-		return
-	}
-	if !library.IsValidEmail(param.Email) {
-		resp.Failed("email format error")
-		return
-	}
-	code, err := library.MakeVerificationCode(param.Email, resp.Context.ClientIP())
-	if err != nil {
-		resp.Failed("failed to generate verification code")
-		return
-	}
-	emailhandler.AsyncSendEmail(emailhandler.EmailConfig{
-		To:      []string{param.Email},
-		Subject: "Verification code",
-		Body:    fmt.Sprintf("Verification code:%s", code),
-	})
-	resp.Success("operate success")
-}
-
-// 根据开始-截止日期获取用户流量
-func GetUserTraffic(resp server.Response) {
+// 查询代理商的用户列表
+func GetUserList(resp server.Response) {
 	param := struct {
-		StartDate int64 `json:"start_time" binding:"required"`
-		EndDate   int64 `json:"end_time" binding:"required"`
+		Page     int    `json:"page"`
+		PageSize int    `json:"page_size"`
+		AgentId  int64  `json:"agent_id"`
+		Username string `json:"username"`
 	}{}
-	// 时间参数检查
 	err := resp.Bind(&param)
 	if err != nil {
 		resp.Failed("param error")
 		return
 	}
-
-	if param.StartDate > param.EndDate {
-		resp.Failed("param error")
-		return
-	}
-	if param.StartDate > time.Now().Unix() || param.EndDate > time.Now().Unix() {
-		resp.Failed("param error")
-		return
-	}
-
 	uid := resp.GetUserID("user_id")
-	if uid <= 0 {
+	if uid <= 0 || param.Page <= 0 || param.PageSize <= 0 || param.AgentId <= 0 {
 		resp.Failed("param error")
 		return
 	}
-	trafficData1 := generateFakeTrafficData()
-	trafficData3 := generateFakeTrafficData()
-	resp.Res["static_traffic_data"] = trafficData1
-	resp.Res["data_traffic_data"] = trafficData3
-
-	trafficData2, err := services.GetUserFlowByDate(param.StartDate, param.EndDate, uid)
+	userList, total, err := services.GetUserList(param.Page, param.PageSize, param.AgentId, param.Username)
 	if err != nil {
-		resp.Failed("failed to obtain user traffic information")
+		resp.Failed(fmt.Sprintf("%v", err.Error()))
 		return
 	}
-	resp.Res["dynamic_traffic_data"] = trafficData2
-
+	resp.Res["user_list"] = userList
+	resp.Res["total"] = total
 	resp.Success("operate success")
-}
-
-// TrafficData 表示单日的流量数据
-type TrafficData struct {
-	Date  string `json:"date"`
-	Bytes int64  `json:"bytes"`
-}
-
-// generateFakeTrafficData 生成最近 7 天的假数据
-func generateFakeTrafficData() []TrafficData {
-	var data []TrafficData
-	now := time.Now()
-
-	for i := 7; i > 0; i-- {
-		date := now.AddDate(0, 0, -i).Format("20060102")
-		bytes := rand.Int63n(1000000) // 随机生成流量数据
-		data = append(data, TrafficData{
-			Date:  date,
-			Bytes: bytes,
-		})
-	}
-
-	return data
 }
 
 // 子用户列表分页查询
@@ -545,35 +294,4 @@ func UpdateSubUser(resp server.Response) {
 		return
 	}
 	resp.Success("operate success")
-}
-
-/*
-重置密码
-*/
-func ResetPassword(resp server.Response) {
-	param := struct {
-		UserId   int64  `json:"user_id"`  //用户ID
-		Password string `json:"password"` //用户密码
-	}{}
-	err := resp.Bind(&param)
-	if err != nil {
-		resp.Failed("param error")
-		return
-	}
-	if param.Password == "" {
-		resp.Failed("param error")
-		return
-	}
-	uid := resp.GetUserID("user_id")
-	if uid <= 0 {
-		resp.Failed("param error")
-		return
-	}
-	err = library.ResetPassword(param.UserId, param.Password)
-	if err != nil {
-		resp.Failed("password reset failed")
-		return
-	}
-	resp.Success("operate success")
-
 }

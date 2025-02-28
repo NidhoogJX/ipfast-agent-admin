@@ -10,7 +10,7 @@
         "param error": "參數錯誤",
          "operate success": "操作成功",
          "operate failed": "操作失敗",
-         "account does not exist/has been cancelled": "帳號不存在/或已註銷",
+         "account does not exist/has been cancelled": "帳號不存在或已註銷",
          "account or password error": "帳號或密碼錯誤",
          "account has been disabled": "帳號已被禁用",
          "auth failed, please contact the administrator": "授權失敗,請聯絡管理員",

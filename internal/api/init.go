@@ -1,6 +1,7 @@
 package api
 
 import (
+	"ipfast_server/internal/api/agent"
 	"ipfast_server/internal/api/announcements"
 	"ipfast_server/internal/api/recharge"
 	"ipfast_server/internal/api/subuser"
@@ -18,6 +19,7 @@ const (
 	proxyPath               = "/proxy"         // 代理路径
 	announcementsRouterPath = "/announcements" // 系统公告路径
 	payPath                 = "/pay"           // 支付路径
+	agentPath               = "/agent"         // 代理商路径
 	rechargePath            = "/recharge"      // 充值路径
 	subuserPath             = "/subuser"       // 子用户路径
 )
@@ -26,78 +28,25 @@ const (
 var userRouter = []server.Router{
 	{
 		RequestType: "POST",
-		Path:        userPath + "/login",
+		Path:        "/login",
 		Handler:     user.Login,
 		// RecaptchaEnabled: true,
 	},
 	{
 		RequestType: "POST",
-		Path:        userPath + "/logout",
+		Path:        "/logout",
 		Handler:     user.LoginOut,
 		JwtEnabled:  true,
 	},
 	{
-		Path:        userPath + "/apply/verifcode",
-		Handler:     user.ApplyVerificationCode,
-		RequestType: "POST",
-	},
-	{
-		Path:        userPath + "/info",
+		Path:        "/info",
 		Handler:     user.UserInfo,
 		RequestType: "GET",
 		JwtEnabled:  true,
 	},
 	{
-		Path:        userPath + "/reset/password",
-		Handler:     user.ResetPassword,
-		RequestType: "POST",
-		JwtEnabled:  true,
-	},
-	{
-		Path:        userPath + "/flow/total",
-		Handler:     user.GetTotalFlowDetail,
-		RequestType: "GET",
-		JwtEnabled:  true,
-	},
-	{
-		Path:        userPath + "/flow/current",
-		Handler:     user.GetCurrentFlowDetail,
-		RequestType: "GET",
-		JwtEnabled:  true,
-	},
-	{
-		Path:        userPath + "/flow/detail",
-		Handler:     user.GetUserFlowDetail,
-		RequestType: "POST",
-		JwtEnabled:  true,
-	},
-	{
 		Path:        userPath + "/list",
 		Handler:     user.GetUserList,
-		RequestType: "POST",
-		JwtEnabled:  true,
-	},
-	{
-		Path:        userPath + "/add",
-		Handler:     user.AddUser,
-		RequestType: "POST",
-		JwtEnabled:  true,
-	},
-	{
-		Path:        userPath + "/edit",
-		Handler:     user.EditUser,
-		RequestType: "POST",
-		JwtEnabled:  true,
-	},
-	{
-		Path:        userPath + "/distribute",
-		Handler:     user.DistributeFlowToUser,
-		RequestType: "POST",
-		JwtEnabled:  true,
-	},
-	{
-		Path:        userPath + "/distribute/log",
-		Handler:     user.GetDistributeFlowLog,
 		RequestType: "POST",
 		JwtEnabled:  true,
 	},
@@ -124,6 +73,34 @@ var displayRouter = []server.Router{}
 // 代理路由
 var proxyRouter = []server.Router{}
 
+// 代理商路由
+var agentRouter = []server.Router{
+	{
+		Path:        agentPath + "/list",
+		Handler:     agent.GetAgentList,
+		RequestType: "POST",
+		JwtEnabled:  true,
+	},
+	{
+		Path:        agentPath + "/add",
+		Handler:     agent.AddAgent,
+		RequestType: "POST",
+		JwtEnabled:  true,
+	},
+	{
+		Path:        agentPath + "/edit",
+		Handler:     agent.EditAgent,
+		RequestType: "POST",
+		JwtEnabled:  true,
+	},
+	{
+		Path:        agentPath + "/recharge",
+		Handler:     agent.RechargeFlowToAgent,
+		RequestType: "POST",
+		JwtEnabled:  true,
+	},
+}
+
 // 充值路径
 var rechargeRouter = []server.Router{
 	{
@@ -143,26 +120,8 @@ var subuserRouter = []server.Router{
 		JwtEnabled:  true,
 	},
 	{
-		Path:        subuserPath + "/add",
-		Handler:     subuser.AddSubuser,
-		RequestType: "POST",
-		JwtEnabled:  true,
-	},
-	{
-		Path:        subuserPath + "/edit",
-		Handler:     subuser.EditSubuser,
-		RequestType: "POST",
-		JwtEnabled:  true,
-	},
-	{
 		Path:        subuserPath + "/flowStats",
 		Handler:     subuser.GetSubuserFlowStats,
-		RequestType: "POST",
-		JwtEnabled:  true,
-	},
-	{
-		Path:        subuserPath + "/export",
-		Handler:     subuser.ExportSubuserList,
 		RequestType: "POST",
 		JwtEnabled:  true,
 	},
@@ -192,6 +151,7 @@ func Setup() {
 				announcementsRouter,
 				payRouter,
 				proxyRouter,
+				agentRouter,
 				subuserRouter,
 				rechargeRouter,
 			),

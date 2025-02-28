@@ -42,14 +42,12 @@ var UserField = []string{
 type UserInfo struct {
 	Id            int64  `json:"user_id"`
 	Name          string `json:"user_name"`
+	AgentName     string `json:"agent_name"`
 	Email         string `json:"user_email"`
 	Phone         string `json:"user_phone"`
-	Password      string `json:"user_password"`
 	TotalTraffic  int64  `json:"total_traffic"`
 	UsedTraffic   int64  `json:"used_traffic"`
 	EnableTraffic int64  `json:"enable_traffic"`
-	LoginIp       string `json:"login_ip"`
-	LoginTime     int64  `json:"login_time"`
 	Status        int8   `json:"user_status"`
 	Description   string `json:"description"`
 	CreateTime    int64  `json:"create_time"`
@@ -142,59 +140,33 @@ func (model User) UpdateLoginInfo() error {
 }
 
 // 用户列表查询
-func (model User) SelectUserList(agentId int64, username string, page, size int, status, totalSort, usedSort, enableSort int8) (userList []UserInfo, total int64, err error) {
-	tx := DB.Table("ip_user as iu")
+func (model User) SelectUserList(page, size int, agentId int64, username string) (userList []UserInfo, total int64, err error) {
+	tx := DB.Table("ip_user AS iu")
 	if username != "" {
-		tx = tx.Where("name like ?", "%"+username+"%")
-	}
-	if status != 2 {
-		tx = tx.Where("status = ?", status)
+		tx.Where("iu.name LIKE ?", "%"+username+"%")
 	}
 	err = tx.Select(`
 		iu.id,
 		iu.name,
+		ia.name AS agent_name,
 		iu.status,
-		iu.email,
-		iu.phone,
-		iu.password,
+		SUM(ifr.purchased_flow) AS total_traffic,
+		SUM(ifr.used_flow) AS used_traffic,
+		SUM(ifr.purchased_flow - ifr.used_flow) AS enable_traffic,
 		iu.description,
-		iu.login_ip,
-		iu.login_time,
 		iu.create_time,
-		iu.update_time,
-		IFNULL(SUM(ifr.purchased_flow),0) AS total_traffic,
-		IFNULL(SUM(ifr.used_flow),0) AS used_traffic,
-		IFNULL(SUM(ifr.purchased_flow-ifr.used_flow),0) AS enable_traffic
+		iu.update_time
 		`).
-		Joins("LEFT JOIN ip_flow_record as ifr on iu.id = ifr.user_id").
-		Where("iu.agent_id = ?", agentId).
+		Joins("LEFT JOIN ip_agent AS ia ON iu.agent_id = ia.id").
+		Joins("LEFT JOIN ip_flow_record AS ifr ON iu.id = ifr.user_id").
+		Where("ia.id = ?", agentId).
+		Group("iu.id").
+		Order("iu.create_time DESC").
 		Count(&total).
-		Group("iu.id").Error
-	if totalSort != 0 {
-		if totalSort == 1 {
-			tx.Order("total_traffic DESC")
-		}
-		if totalSort == 2 {
-			tx.Order("total_traffic ASC")
-		}
-	} else if usedSort != 0 {
-		if usedSort == 1 {
-			tx.Order("used_traffic DESC")
-		}
-		if usedSort == 2 {
-			tx.Order("used_traffic ASC")
-		}
-	} else if enableSort != 0 {
-		if enableSort == 1 {
-			tx.Order("enable_traffic DESC")
-		}
-		if enableSort == 2 {
-			tx.Order("enable_traffic ASC")
-		}
-	}
-	tx.Offset((page - 1) * size).
+		Order("iu.create_time DESC").
+		Offset((page - 1) * size).
 		Limit(size).
-		Scan(&userList)
+		Scan(&userList).Error
 	return
 }
 

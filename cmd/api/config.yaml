@@ -29,7 +29,7 @@ database:
   host: 18.162.191.165:9306
   user: root # 数据库用户名
   password: mysdkdata # 数据库密码
-  dbname: flowmanger # 数据库名称
+  dbname: flowmanger_test # 数据库名称
   log: info # 数据库日志级别  silent >  rrror > Warn  > Info 
 
 # redis配置,支持热更新

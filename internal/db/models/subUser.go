@@ -133,14 +133,11 @@ func (model SubUser) GetSubUsersByParentUserId() (subUsers []SubUser, err error)
 	return subUsers, err
 }
 
-// 查询代理商下用户的子账户
-func (model SubUser) SelectSubUserListByAgentId(userId int64, page, size int, subuserName string, status int8) (subUsers []SubUserInfo, total int64, err error) {
+// 查询代理商下某用户的子账户
+func (model SubUser) SelectSubUserListByUserId(userId int64, page, size int, subuserName string) (subUsers []SubUserInfo, total int64, err error) {
 	tx := DB.Table("ip_sub_user AS isu")
 	if subuserName != "" {
 		tx.Where("isu.username like ?", "%"+subuserName+"%")
-	}
-	if status != 2 {
-		tx.Where("isu.status = ?", status)
 	}
 	err = tx.Select(`
 			isu.*,
@@ -149,6 +146,7 @@ func (model SubUser) SelectSubUserListByAgentId(userId int64, page, size int, su
 		Joins("LEFT JOIN ip_user AS iu ON isu.parent_user_id = iu.id").
 		Where("parent_user_id = ?", userId).
 		Count(&total).
+		Order("isu.created_time").
 		Offset((page - 1) * size).
 		Limit(size).
 		Scan(&subUsers).Error
