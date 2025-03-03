@@ -1,9 +1,9 @@
-name: 自动打包为镜像并推送DockerHub仓库[TOC-AGENT服务]
+name: 自动打包为镜像并推送DockerHub仓库[TOC-AGENT-ADMIN服务]
 
 on:
   push:
     tags:
-      - 'toc-agent-v*' 
+      - 'toc-agent-admin-v*' 
 
 jobs:
   build-and-push:
@@ -26,16 +26,16 @@ jobs:
         id: extract_tag
         run: |
           FULL_TAG=${GITHUB_REF#refs/tags/}
-          TAG=${FULL_TAG#toc-agent-v}
+          TAG=${FULL_TAG#toc-agent-admin-v}
           IFS='-' read -r VERSION TARGETOS TARGETARCH <<< "$TAG"
           echo "Parsed tag: $VERSION, target OS: $TARGETOS, target arch: $TARGETARCH"
           if [ -z "$VERSION" ] || [ -z "$TARGETOS" ] || [ -z "$TARGETARCH" ]; then
             echo "Error: One of the required variables is empty."
             exit 1
           fi
-          docker build -f Dockerfile -t toc-agent . --build-arg BUILDDIR=./cmd/api --build-arg EXPOSE_PORT=8098 --build-arg TARGETOS=$TARGETOS --build-arg TARGETARCH=$TARGETARCH
-          TAG_NAME="dahangkk/toc-agent:${VERSION}_${TARGETARCH}"
+          docker build -f Dockerfile -t toc-agent-admin . --build-arg BUILDDIR=./cmd/api --build-arg EXPOSE_PORT=8098 --build-arg TARGETOS=$TARGETOS --build-arg TARGETARCH=$TARGETARCH
+          TAG_NAME="dahangkk/toc-agent-admin:${VERSION}_${TARGETARCH}"
           echo "Tagging image as $TAG_NAME"
-          docker tag toc-agent:latest $TAG_NAME
+          docker tag toc-agent-admin:latest $TAG_NAME
           echo "Pushing image $TAG_NAME"
           docker push $TAG_NAME
