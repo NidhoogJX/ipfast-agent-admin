@@ -163,7 +163,6 @@ func (model User) SelectUserList(page, size int, agentId int64, username string)
 		Group("iu.id").
 		Order("iu.create_time DESC").
 		Count(&total).
-		Order("iu.create_time DESC").
 		Offset((page - 1) * size).
 		Limit(size).
 		Scan(&userList).Error
