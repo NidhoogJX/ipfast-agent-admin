@@ -4,7 +4,6 @@ import (
 	"ipfast_server/internal/api"
 	"ipfast_server/internal/config"
 	"ipfast_server/internal/config/i18n"
-	stripehandler "ipfast_server/internal/handler/stripeHandler"
 
 	"ipfast_server/internal/db/core/gorm"
 	"ipfast_server/internal/db/models"
@@ -60,8 +59,8 @@ func loggingInit() {
 func clientApiInit() {
 	api.Setup()
 	i18n.Setup()
-	stripehandler.Setup()
-	stripehandler.Init()
+	// stripehandler.Setup()
+	// stripehandler.Init()
 	config.SetWatching("web", func(oldWebConfig, newWebConfig interface{}) {
 		log.Info("接口服务配置发生变化,将重启接口服务:\n旧配置:%+v,\n新配置:%+v", oldWebConfig, newWebConfig)
 		api.Setup()
