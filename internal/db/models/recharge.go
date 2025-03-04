@@ -1,11 +1,14 @@
 package models
 
+import "gorm.io/gorm"
+
 // 充值记录表
 type Recharge struct {
 	Id          string `json:"id" gorm:"primary_key;type:varchar(300);comment:充值订单号;not null;index"`
 	AgentID     int64  `json:"agent_id" gorm:"type:bigint;comment:用户ID;not null;index"`
-	Count       int64  `json:"count" gorm:"type:bigint;comment:充值流量;not null"`
-	Unit        int8   `json:"unit" gorm:"type:tinyint;comment:单位:1GB,2TB,3PB;not null"`
+	Count       int64  `json:"count" gorm:"type:bigint;comment:充值流量(Byte);not null"`
+	BeforeFlow  int64  `json:"before_flow" gorm:"type:bigint;comment:充值前流量(Byte);not null"`
+	AfterFlow   int64  `json:"after_flow" gorm:"type:bigint;comment:充值后流量(Byte);not null"`
 	PayMethod   string `json:"pay_method" gorm:"type:varchar(100);comment:支付方式;not null"`
 	Description string `json:"descriprion" gorm:"type:varchar(500);comment:订单描述;not null"`
 	Status      int8   `json:"status" gorm:"type:tinyint;comment:订单状态:0充值失败,1充值成功;default:0;not null"`
@@ -15,11 +18,10 @@ type Recharge struct {
 
 type RechargeInfo struct {
 	Id          string `json:"id"`
-	Name        string `json:"name"`
+	Username    string `json:"username"`
 	Count       int64  `json:"count"`
 	BeforeFlow  int64  `json:"before_flow"`
 	AfterFlow   int64  `json:"after_flow"`
-	Unit        int8   `json:"unit"`
 	Description string `json:"descriprion"`
 	CreateTime  int64  `json:"create_time"`
 }
@@ -30,8 +32,8 @@ func (Recharge) TableName() string {
 }
 
 // 创建充值记录
-func (model Recharge) Create() (err error) {
-	return DB.Create(&model).Error
+func (model Recharge) Create(tx *gorm.DB) (err error) {
+	return tx.Create(&model).Error
 }
 
 // 获取充值记录列表
@@ -42,19 +44,10 @@ func (model Recharge) SelectRechargeList(rechargeId string, page, size int) (rec
 	}
 	err = tx.Select(`
 		ir.id,
-		ia.name,
+		ia.name AS username,
 		ir.count,
-		ir.unit,
-		(SUM(ir.count) OVER (
-			PARTITION BY ir.agent_id 
-			ORDER BY ir.create_time, ir.id 
-			ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-		) - ir.count) AS before_flow,
-		SUM(ir.count) OVER (
-			PARTITION BY ir.agent_id 
-			ORDER BY ir.create_time, ir.id 
-			ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-		) AS after_flow,
+		ir.before_flow,
+		ir.after_flow,
 		ir.description,
 		ir.create_time
 		`).
@@ -64,5 +57,20 @@ func (model Recharge) SelectRechargeList(rechargeId string, page, size int) (rec
 		Offset((page - 1) * size).
 		Limit(size).
 		Scan(&rechargeList).Error
+	return
+}
+
+// 查询代理商是否有充值记录
+func (model Recharge) SelectCountByAgentId(agentId int64, tx *gorm.DB) (count int64, err error) {
+	err = tx.Model(&model).Where("agent_id = ?", agentId).Count(&count).Limit(1).Error
+	return
+}
+
+// 根据代理商id获取最近的一条充值记录
+func (model Recharge) SelectByAgentId(agentId int64, tx *gorm.DB) (recharge Recharge, err error) {
+	err = tx.Model(&model).
+		Where("agent_id = ?", agentId).
+		Order("create_time DESC").
+		First(&recharge).Error
 	return
 }

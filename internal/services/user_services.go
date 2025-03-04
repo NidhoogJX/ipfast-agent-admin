@@ -340,80 +340,119 @@ func RechargeFlowToAgent(agentId, count int64, sign, description string) (err er
 	if agent.Status != 1 {
 		return fmt.Errorf("agent is disabled")
 	}
+	if count > 100000000 {
+		return fmt.Errorf("recharge count is too large")
+	}
 	nowTime := time.Now().Unix()
 	now := time.Now()
 	msec := now.UnixMilli() % 1000
 	rechargeId := fmt.Sprintf("%04d%02d%02d%02d%02d%02d%03d", now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(), msec)
 	flow := count * 1024 * 1024 * 1024
 	if sign == "+" {
-		if count > 100000000 {
-			return fmt.Errorf("recharge count is too large")
-		}
-		// 开启事务处理
-		err = models.DB.Instance.Transaction(func(tx *gorm.DB) error {
-			// 为代理商添加流量
-			err = models.Agent{
-				Id: agentId,
-			}.RechargeFlow(flow, nowTime)
-			if err != nil {
-				log.Error("failed to recharge flow to agent, agentId: %d", agentId)
-				return fmt.Errorf("failed to recharge flow to agent")
-			}
-			// 添加流量充值记录
-			err = models.Recharge{
-				Id:          rechargeId,
-				AgentID:     agentId,
-				Count:       count,
-				Unit:        1,
-				PayMethod:   "管理员充值",
-				Description: description,
-				Status:      1,
-				CreateTime:  nowTime,
-				UpdateTime:  nowTime,
-			}.Create()
-			if err != nil {
-				log.Error("failed to add recharge record to agent, agentId: %d", agentId)
-				return fmt.Errorf("failed to add recharge record to agent")
-			}
-			return nil
-		})
+		err = AddFlow(agent, rechargeId, description, flow, nowTime)
 	} else {
-		if agent.TotalFlow < flow {
-			log.Error("reduced flow more than total flow of agents, agentId: %d", agentId)
-			return fmt.Errorf("reduced flow more than total flow of agents")
-		}
-		// 开启事务处理
-		err = models.DB.Instance.Transaction(func(tx *gorm.DB) error {
-			// 减少代理商流量
-			err = models.Agent{
-				Id: agentId,
-			}.ReduceFlow(flow, nowTime)
-			if err != nil {
-				log.Error("failed to reduce flow to agent, agentId: %d", agentId)
-				return fmt.Errorf("failed to reduce flow to agent")
-			}
-			// 添加流量减少记录
-			err = models.Recharge{
-				Id:          rechargeId,
-				AgentID:     agentId,
-				Count:       -count,
-				Unit:        1,
-				PayMethod:   "管理员充值",
-				Description: description,
-				Status:      1,
-				CreateTime:  nowTime,
-				UpdateTime:  nowTime,
-			}.Create()
-			if err != nil {
-				log.Error("failed to add recharge record to agent, agentId: %d", agentId)
-				return fmt.Errorf("failed to add recharge record to agent")
-			}
-			return nil
-		})
+		err = ReduceFlow(agent, rechargeId, description, flow, nowTime)
 	}
 	if err != nil {
 		log.Info("分配流量成功, agentId: %d, sign: %s, count: %d", agentId, sign, count)
 	}
+	return
+}
+
+// 添加流量
+func AddFlow(agent models.Agent, rechargeId, description string, flow, now int64) (err error) {
+	// 开启事务处理
+	err = models.DB.Instance.Transaction(func(tx *gorm.DB) error {
+		// 为代理商添加流量
+		err := models.Agent{
+			Id: agent.Id,
+		}.RechargeFlow(flow, now, tx)
+		if err != nil {
+			log.Error("failed to recharge flow to agent, agentId: %d", agent.Id)
+			return fmt.Errorf("failed to recharge flow to agent")
+		}
+		// 添加流量充值记录
+		count, err := models.Recharge{}.SelectCountByAgentId(agent.Id, tx)
+		if err != nil {
+			log.Error("failed to obtain recharge record, agentId: %d", agent.Id)
+			return fmt.Errorf("failed to obtain recharge record")
+		}
+		recharge := models.Recharge{}
+		if count != 0 {
+			recharge, err = models.Recharge{}.SelectByAgentId(agent.Id, tx)
+			if err != nil {
+				log.Error("failed to obtain recharge record, agentId: %d", agent.Id)
+				return fmt.Errorf("failed to obtain recharge record")
+			}
+		}
+		err = models.Recharge{
+			Id:          rechargeId,
+			AgentID:     agent.Id,
+			Count:       flow,
+			BeforeFlow:  recharge.AfterFlow,
+			AfterFlow:   recharge.AfterFlow + flow,
+			PayMethod:   "管理员充值",
+			Description: description,
+			Status:      1,
+			CreateTime:  now,
+			UpdateTime:  now,
+		}.Create(tx)
+		if err != nil {
+			log.Error("failed to add recharge record to agent, agentId: %d", agent.Id)
+			return fmt.Errorf("failed to add recharge record to agent")
+		}
+		return nil
+	})
+	return
+}
+
+// 减少流量
+func ReduceFlow(agent models.Agent, rechargeId, description string, flow, now int64) (err error) {
+	if agent.TotalFlow < flow {
+		return fmt.Errorf("not enough flow")
+	}
+	// 开启事务处理
+	err = models.DB.Instance.Transaction(func(tx *gorm.DB) error {
+		// 减少代理商流量
+		err = models.Agent{
+			Id: agent.Id,
+		}.ReduceFlow(flow, now, tx)
+		if err != nil {
+			log.Error("failed to reduce agent flow, agentId: %d", agent.Id)
+			return fmt.Errorf("failed to reduce agent flow")
+		}
+		// 添加流量减少记录
+		count, err := models.Recharge{}.SelectCountByAgentId(agent.Id, tx)
+		if err != nil {
+			log.Error("failed to obtain recharge record, agentId: %d", agent.Id)
+			return fmt.Errorf("failed to obtain recharge record")
+		}
+		recharge := models.Recharge{}
+		if count != 0 {
+			recharge, err = models.Recharge{}.SelectByAgentId(agent.Id, tx)
+			if err != nil {
+				log.Error("failed to obtain recharge record, agentId: %d", agent.Id)
+				return fmt.Errorf("failed to obtain recharge record")
+			}
+		}
+		err = models.Recharge{
+			Id:          rechargeId,
+			AgentID:     agent.Id,
+			Count:       -flow,
+			BeforeFlow:  recharge.AfterFlow,
+			AfterFlow:   recharge.AfterFlow - flow,
+			PayMethod:   "管理员充值",
+			Description: description,
+			Status:      1,
+			CreateTime:  now,
+			UpdateTime:  now,
+		}.Create(tx)
+		if err != nil {
+			log.Error("failed to add recharge record to agent, agentId: %d", agent.Id)
+			return fmt.Errorf("failed to add recharge record to agent")
+		}
+		return nil
+	})
 	return
 }
 

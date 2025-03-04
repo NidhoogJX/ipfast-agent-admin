@@ -191,8 +191,8 @@ func (model Agent) UpdateInfo() error {
 }
 
 // 给代理商充值流量
-func (model Agent) RechargeFlow(count, updateTime int64) (err error) {
-	err = DB.Model(&model).Updates(map[string]interface{}{
+func (model Agent) RechargeFlow(count, updateTime int64, tx *gorm.DB) (err error) {
+	err = tx.Model(&model).Updates(map[string]interface{}{
 		"total_flow":  gorm.Expr("total_flow + ?", count),
 		"update_time": updateTime,
 	}).Error
@@ -200,8 +200,8 @@ func (model Agent) RechargeFlow(count, updateTime int64) (err error) {
 }
 
 // 减少代理商流量
-func (model Agent) ReduceFlow(count, updateTime int64) (err error) {
-	err = DB.Model(&model).Updates(map[string]interface{}{
+func (model Agent) ReduceFlow(count, updateTime int64, tx *gorm.DB) (err error) {
+	err = tx.Model(&model).Updates(map[string]interface{}{
 		"total_flow":  gorm.Expr("total_flow - ?", count),
 		"update_time": updateTime,
 	}).Error
