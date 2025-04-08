@@ -38,5 +38,6 @@ func AutoMigrateAllModels() error {
 		&Admin{},
 		&Agent{},
 		&Recharge{},
+		&UserFlowHour{},
 	) // 自动迁移数据库
 }

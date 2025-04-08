@@ -61,24 +61,3 @@ type DateFlow struct {
 	Date string `json:"date"`
 	Flow int64  `json:"flow"`
 }
-
-// 根据开始-截止日期和用户ID查询所有子账户流量
-func (model UserFlow) SelectDynamicFlowStats(subuserId, startTime, endTime int64) (dynamicFlowData []DateFlow, err error) {
-	err = DB.Instance.Raw(`
-		SELECT 
-			DATE_FORMAT(a.date, "%Y-%m-%d") as date, 
-			IFNULL(SUM(b.up), 0) as flow 
-		FROM 
-			(SELECT CURDATE() - INTERVAL (a.a + (10 * b.a) + (100 * c.a)) DAY as date 
-			 FROM (SELECT 0 as a union all SELECT 1 union all SELECT 2 union all SELECT 3 union all SELECT 4 union all SELECT 5 union all SELECT 6 union all SELECT 7 union all SELECT 8 union all SELECT 9) as a 
-			 CROSS JOIN (SELECT 0 as a union all SELECT 1 union all SELECT 2 union all SELECT 3 union all SELECT 4 union all SELECT 5 union all SELECT 6 union all SELECT 7 union all SELECT 8 union all SELECT 9) as b 
-			 CROSS JOIN (SELECT 0 as a union all SELECT 1 union all SELECT 2 union all SELECT 3 union all SELECT 4 union all SELECT 5 union all SELECT 6 union all SELECT 7 union all SELECT 8 union all SELECT 9) as c) a 
-		LEFT JOIN ip_user_flow b 
-			ON FROM_UNIXTIME(b.created_time, "%Y-%m-%d") = a.date 
-			AND b.s_user_id = ? 
-		WHERE a.date BETWEEN FROM_UNIXTIME(?, "%Y-%m-%d") AND FROM_UNIXTIME(?, "%Y-%m-%d") 
-		GROUP BY a.date
-		ORDER BY a.date 
-	`, subuserId, startTime, endTime).Scan(&dynamicFlowData).Error
-	return
-}
