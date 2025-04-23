@@ -8,7 +8,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var jwtKey = []byte("7ghsjh*&*^&^%$#")
+var jwtKey = []byte("rK9xH6oN1bA9mG9")
 
 // 生成 JWT 令牌
 func GenerateToken(userId string) (string, error) {
